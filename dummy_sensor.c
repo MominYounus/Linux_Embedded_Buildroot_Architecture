@@ -6,6 +6,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/uaccess.h> // copy_to_user
+#include <linux/minmax.h> // partial read
 
 // Global variable to hold our hardware data
 static u32 active_sensor_id = 0;
@@ -17,23 +18,31 @@ static irqreturn_t sensor_isr(int irq, void *dev_id) {
 }
 
 //--- PHASE 1: USER SPACE INTERFACE ---
+// Partial Read
 static ssize_t sensor_read(struct file *file, char __user *user_buf,
-                           size_t count, loff_t *ppos) {
-    char buf[32];
-    int len;
+						   size_t count, loff_t *ppos) {
+	char buf[32];
+	int len;
+	int bytes_to_copy;
 
-    if (*ppos > 0)
-        return 0; // EOF
+	if (*ppos == 0)
+		active_sensor_id = 0x42;
+	else
+		active_sensor_id = 0x99;
+	
+	len = snprintf(buf, sizeof(buf), "Hardware Sensor ID is: 0x%X\n", active_sensor_id);
 
-    // Formating the hardware data into string
-    len = snprintf(buf, sizeof(buf), "Hardware Sensor ID is: 0x%X\n",
-                   active_sensor_id);
+	if (*ppos >= len)
+		return 0;
 
-    if (copy_to_user(user_buf, buf, len))
-        return -EFAULT;
+	bytes_to_copy = min((size_t)count, (size_t)len - *ppos);
 
-    *ppos += len;
-    return len;
+	if (copy_to_user(user_buf, buf + *ppos, bytes_to_copy))
+		return -EFAULT;
+
+	*ppos += bytes_to_copy;
+	return bytes_to_copy;
+	
 }
 
 static const struct file_operations sensor_fops = {
