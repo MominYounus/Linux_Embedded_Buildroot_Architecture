@@ -7,6 +7,8 @@
 #include <linux/platform_device.h>
 #include <linux/uaccess.h> // copy_to_user
 #include <linux/minmax.h> // partial read
+#include <linux/string.h> // partial read
+#include <linux/slab.h> // partial read
 
 // Global variable to hold our hardware data
 static u32 active_sensor_id = 0;
@@ -19,19 +21,34 @@ static irqreturn_t sensor_isr(int irq, void *dev_id) {
 
 //--- PHASE 1: USER SPACE INTERFACE ---
 // Partial Read
+
+static int sensor_open(struct inode *inode, struct file *file) {
+	char *session_buf;
+
+	session_buf = kmalloc(32, GFP_KERNEL); // GFP means it can sleep when memory is tight.
+	if (!session_buf) return -ENOMEM;
+
+	snprintf(session_buf, 32, "Hardware Sensor ID: 0x%X\n", active_sensor_id);
+
+	file->private_data = session_buf;
+
+	return 0;
+}
+
+static int sensor_release(struct inode *inode, struct file *file) {
+	kfree(file->private_data);
+	return 0;
+}
+
 static ssize_t sensor_read(struct file *file, char __user *user_buf,
 						   size_t count, loff_t *ppos) {
-	char buf[32];
+	char *buf;
 	int len;
 	int bytes_to_copy;
 
-	if (*ppos == 0)
-		active_sensor_id = 0x42;
-	else
-		active_sensor_id = 0x99;
+	buf = file->private_data;
+	len = strlen(buf);
 	
-	len = snprintf(buf, sizeof(buf), "Hardware Sensor ID is: 0x%X\n", active_sensor_id);
-
 	if (*ppos >= len)
 		return 0;
 
@@ -45,9 +62,12 @@ static ssize_t sensor_read(struct file *file, char __user *user_buf,
 	
 }
 
+
 static const struct file_operations sensor_fops = {
     .owner = THIS_MODULE,
     .read = sensor_read,
+	.open = sensor_open,
+	.release = sensor_release,
 };
 
 static struct miscdevice sensor_misc = {
