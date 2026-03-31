@@ -9,10 +9,13 @@
 #include <linux/minmax.h> // partial read
 #include <linux/string.h> // partial read
 #include <linux/slab.h> // partial read
+#include <linux/mutex.h>
+#include "dummy_sensor_ioctl.h"
 
 // Global variable to hold our hardware data
 static u32 active_sensor_id = 0;
 static int sample_rate = 50;
+static DEFINE_MUTEX(sensor_lock);
 
 static irqreturn_t sensor_isr(int irq, void *dev_id) {
     printk(KERN_INFO "DummySensor: INTERRUPT FIRED on IRQ %d!\n", irq);
@@ -62,12 +65,49 @@ static ssize_t sensor_read(struct file *file, char __user *user_buf,
 	
 }
 
+static long sensor_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
+	int new_rate;
+
+	switch(cmd) {
+	case DUMMY_SENSOR_RESET:
+
+		if (mutex_lock_interruptible(&sensor_lock))
+			return -ERESTARTSYS;
+		
+		active_sensor_id = 0x42;
+		sample_rate = 50;
+		printk(KERN_INFO "DummySensor: Hardware RESET via ioctl\n");
+
+		mutex_unlock(&sensor_lock);
+		break;
+
+	case DUMMY_SENSOR_SET_RATE:
+		
+		if (get_user(new_rate, (int __user *)arg))
+			return -EFAULT;
+		
+		if (mutex_lock_interruptible(&sensor_lock))
+			return -ERESTARTSYS;
+		
+		sample_rate = new_rate;
+		printk(KERN_INFO "DummySensor: Sample Rate updated to %d via via ioctl\n", new_rate);
+
+		mutex_unlock(&sensor_lock);
+		break;
+
+	default:
+		return -ENOTTY;
+	}
+
+	return 0;
+}
 
 static const struct file_operations sensor_fops = {
     .owner = THIS_MODULE,
     .read = sensor_read,
 	.open = sensor_open,
 	.release = sensor_release,
+	.unlocked_ioctl = sensor_ioctl,
 };
 
 static struct miscdevice sensor_misc = {
@@ -83,7 +123,11 @@ static struct miscdevice sensor_misc = {
 // called when the user runs: cat /sys/.../sample_rate
 static ssize_t sample_rate_show(struct device *dev,
                                 struct device_attribute *attr, char *buf) {
+	if (mutex_lock_interruptible(&sensor_lock))
+		return -ERESTARTSYS;
+	
     return sprintf(buf, "%d\n", sample_rate);
+	mutex_unlock(&sensor_lock);
 }
 
 // Called when the user runs: echo 100 > /sys/.../sample_rate
@@ -91,11 +135,17 @@ static ssize_t sample_rate_store(struct device *dev,
                                  struct device_attribute *attr, const char *buf,
                                  size_t count) {
 	int new_rate;
+
+	if (mutex_lock_interruptible(&sensor_lock))
+		return -ERESTARTSYS;
+	
 	// Parse the string from user space into an integer
 	if(sscanf(buf, "%d", &new_rate) == 1) {
 		sample_rate = new_rate;
 		printk(KERN_INFO "DummySensor: Sample rate changed to %d Hz\n", sample_rate);
 	}
+
+	mutex_unlock(&sensor_lock);
 	return count;
 }
 
@@ -110,7 +160,7 @@ static int sensor_probe(struct platform_device *pdev) {
 
     printk(KERN_INFO "DummySensor: Hardware found. Probing...\n");
 
-    ret = of_property_read_u32(dev->of_node, "sensor-id", &active_sensor_id);
+    ret = of_property_read_u32(dev->of_node, "sensor-id", &active_sensor_id); 
     if (ret)
         return ret;
 
@@ -148,13 +198,11 @@ static int sensor_probe(struct platform_device *pdev) {
 
 /* ROOM FUNCTION */
 // Called when the module is unloaded or physically ripped out
-static int sensor_remove(struct platform_device *pdev) {
+static void sensor_remove(struct platform_device *pdev) {
     misc_deregister(&sensor_misc);
     printk(KERN_INFO "DummySensor: Driver and /dev node removed.\n");
 
 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_sample_rate.attr);
-	
-    return 0;
 }
 
 /* 1. MATCH TABLE */
