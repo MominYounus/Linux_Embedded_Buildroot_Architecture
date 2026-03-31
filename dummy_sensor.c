@@ -10,15 +10,38 @@
 #include <linux/string.h> // partial read
 #include <linux/slab.h> // partial read
 #include <linux/mutex.h>
+#include <linux/workqueue.h> //Bottom Halves
+#include <linux/delay.h> // For msleep()
 #include "dummy_sensor_ioctl.h"
 
 // Global variable to hold our hardware data
 static u32 active_sensor_id = 0;
 static int sample_rate = 50;
 static DEFINE_MUTEX(sensor_lock);
+static struct work_struct sensor_work; 
 
+// THE BOTTOM HALF
+// It runs in a process context, meaning it can sleep and take mutexes safely.
+static void sensor_work_handler(struct work_struct *work) {
+	printk(KERN_INFO "DummySensor: [Bottom Half] Starting heavy data processing...\n");
+
+	// Safely using our mutex in the bottom half.
+	mutex_lock(&sensor_lock);
+
+	// Simulating heavy hardware processing that takes 1 full second.
+	msleep(1000);
+
+	printk(KERN_INFO "DummySensor: [Bottom Half] Processing complete. Current rate %d\n", sample_rate);
+}
+
+// THIS IS THE TOP HALF
+// It runs in interrupt, NO SLEEP, NO MUTEX.
 static irqreturn_t sensor_isr(int irq, void *dev_id) {
-    printk(KERN_INFO "DummySensor: INTERRUPT FIRED on IRQ %d!\n", irq);
+    printk(KERN_INFO "DummySensor: [Top Half] Hardware IRQ Fired! Deferring work...\n");
+	
+	// Toss the heavy lifting to the kernel's work therad.
+	schedule_work(&sensor_work);
+	
     return IRQ_HANDLED;
 }
 
@@ -95,6 +118,13 @@ static long sensor_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		mutex_unlock(&sensor_lock);
 		break;
 
+	case DUMMY_SENSOR_TRIGGER_IRQ:
+		printk(KERN_INFO "DummySensor: [IOCTL] Manually triggering Top Half...\n");
+		// we manually call the isr function
+		// We pass 18 as the irq number and NULL just to satisfy the arguments.
+		sensor_isr(18, NULL);
+		break;
+		
 	default:
 		return -ENOTTY;
 	}
@@ -123,11 +153,14 @@ static struct miscdevice sensor_misc = {
 // called when the user runs: cat /sys/.../sample_rate
 static ssize_t sample_rate_show(struct device *dev,
                                 struct device_attribute *attr, char *buf) {
+	ssize_t ret;
 	if (mutex_lock_interruptible(&sensor_lock))
 		return -ERESTARTSYS;
 	
-    return sprintf(buf, "%d\n", sample_rate);
+    ret = sprintf(buf, "%d\n", sample_rate);
 	mutex_unlock(&sensor_lock);
+
+	return ret;
 }
 
 // Called when the user runs: echo 100 > /sys/.../sample_rate
@@ -192,6 +225,8 @@ static int sensor_probe(struct platform_device *pdev) {
 		printk(KERN_INFO "DummySensor: Failed to create sysfs entry\n");
 		return ret;
 	}
+
+	INIT_WORK(&sensor_work, sensor_work_handler);
 	
     return 0;
 }

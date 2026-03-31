@@ -1,4 +1,4 @@
-obj-m +=  dummy_sensor.o 
+obj-m +=  dummy_sensor.o
 KDIR := ~/kernel-dev/build_arm64
 
 CROSS_COMPILE := aarch64-linux-gnu-
