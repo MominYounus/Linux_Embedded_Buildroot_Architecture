@@ -18,7 +18,7 @@
 static u32 active_sensor_id = 0;
 static int sample_rate = 50;
 static DEFINE_MUTEX(sensor_lock);
-static struct work_struct sensor_work; 
+static struct work_struct sensor_work;
 
 // THE BOTTOM HALF
 // It runs in a process context, meaning it can sleep and take mutexes safely.
@@ -84,8 +84,8 @@ static ssize_t sensor_read(struct file *file, char __user *user_buf,
 		return -EFAULT;
 
 	*ppos += bytes_to_copy;
-	return bytes_to_copy;
-	
+	return bytes_to_copy;	
+
 }
 
 static long sensor_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
