@@ -12,7 +12,7 @@
 #include <linux/mutex.h>
 #include <linux/workqueue.h> //Bottom Halves
 #include <linux/delay.h> // For msleep()
-#include "dummy_sensor_ioctl.h"
+#include "../include/dummy_sensor_ioctl.h"
 
 // Global variable to hold our hardware data
 static u32 active_sensor_id = 0;
@@ -233,11 +233,13 @@ static int sensor_probe(struct platform_device *pdev) {
 
 /* ROOM FUNCTION */
 // Called when the module is unloaded or physically ripped out
-static void sensor_remove(struct platform_device *pdev) {
+static int sensor_remove(struct platform_device *pdev) {
     misc_deregister(&sensor_misc);
     printk(KERN_INFO "DummySensor: Driver and /dev node removed.\n");
 
 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_sample_rate.attr);
+
+    return 0;
 }
 
 /* 1. MATCH TABLE */
