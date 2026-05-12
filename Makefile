@@ -1,4 +1,4 @@
-obj-m +=  src/dummy_sensor.o
+obj-m +=  mpu6050_driver.o
 KDIR := ~/kernel-dev/build_arm64
 
 CROSS_COMPILE := aarch64-linux-gnu-
