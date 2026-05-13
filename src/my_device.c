@@ -23,7 +23,8 @@ DEFINE_MUTEX(my_mutex);
 static struct timer_list my_timer;
 
 /* called when user reads: cat /dev/my_device */
-static ssize_t my_read(struct file *file, char __user *user_buf, size_t count, loff_t *popps) {
+static ssize_t my_read(struct file *file, char __user *user_buf, size_t count, loff_t *popps)
+{
 	int bytes_to_copy;
 	int ret;
 
@@ -41,7 +42,7 @@ static ssize_t my_read(struct file *file, char __user *user_buf, size_t count, l
 		ret = -EFAULT; //failed to copy
 		goto unlock_and_exit;
 	}
-
+	
 	*popps += bytes_to_copy;
 	ret = bytes_to_copy;
 
@@ -51,7 +52,8 @@ static ssize_t my_read(struct file *file, char __user *user_buf, size_t count, l
 }
 
 /* called when user writes echo "hello" > /dev/my_device */
-static ssize_t my_write(struct file *file, const char __user *user_buf, size_t count, loff_t *popps) {
+static ssize_t my_write(struct file *file, const char __user *user_buf, size_t count, loff_t *popps)
+{
 	int bytes_to_copy = count;
 	int ret = count;
 	
@@ -84,7 +86,8 @@ static ssize_t my_write(struct file *file, const char __user *user_buf, size_t c
  * Now this should clear the kernel buffer, without using write()
  */
 
-static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
+static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
 	int ret = 0;
 	mutex_lock(&my_mutex);
 	
@@ -103,7 +106,8 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 	return ret;
 }
 
-static void timer_callback(struct timer_list *t) {
+static void timer_callback(struct timer_list *t)
+{
 	printk(KERN_INFO "MyDevice: Timer expired! Jiffies: %lu\n", jiffies);
 
 	//Re-arm the timer to fire again in 2 seconds (repeating timer)
@@ -125,12 +129,13 @@ static struct miscdevice my_device = {
 	.fops = &my_fops,
 };
 
-static int __init my_init(void) {
+static int __init my_init(void)
+{
 	int ret;
 	ret = misc_register(&my_device); //this returns 0 if SUCCESS and a -ve number if FAILED. 
 
 	if (ret)
-	  return ret;
+		return ret;
 
 	printk(KERN_INFO "MyDevice: Registered /dev/simple_device\n");
 
@@ -142,7 +147,8 @@ static int __init my_init(void) {
 	return 0;
 }
 
-static void __exit my_exit(void) {
+static void __exit my_exit(void)
+{
 	del_timer(&my_timer);
 	misc_deregister(&my_device);
 	printk(KERN_INFO "MyDevice: Unregistered......\n");

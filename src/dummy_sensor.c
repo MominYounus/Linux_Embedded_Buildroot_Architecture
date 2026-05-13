@@ -22,7 +22,8 @@ static struct work_struct sensor_work;
 
 // THE BOTTOM HALF
 // It runs in a process context, meaning it can sleep and take mutexes safely.
-static void sensor_work_handler(struct work_struct *work) {
+static void sensor_work_handler(struct work_struct *work)
+{
 	printk(KERN_INFO "DummySensor: [Bottom Half] Starting heavy data processing...\n");
 
 	// Safely using our mutex in the bottom half.
@@ -36,7 +37,8 @@ static void sensor_work_handler(struct work_struct *work) {
 
 // THIS IS THE TOP HALF
 // It runs in interrupt, NO SLEEP, NO MUTEX.
-static irqreturn_t sensor_isr(int irq, void *dev_id) {
+static irqreturn_t sensor_isr(int irq, void *dev_id)
+{
     printk(KERN_INFO "DummySensor: [Top Half] Hardware IRQ Fired! Deferring work...\n");
 	
 	// Toss the heavy lifting to the kernel's work therad.
@@ -48,7 +50,8 @@ static irqreturn_t sensor_isr(int irq, void *dev_id) {
 //--- PHASE 1: USER SPACE INTERFACE ---
 // Partial Read
 
-static int sensor_open(struct inode *inode, struct file *file) {
+static int sensor_open(struct inode *inode, struct file *file)
+{
 	char *session_buf;
 
 	session_buf = kmalloc(32, GFP_KERNEL); // GFP means it can sleep when memory is tight.
@@ -61,13 +64,15 @@ static int sensor_open(struct inode *inode, struct file *file) {
 	return 0;
 }
 
-static int sensor_release(struct inode *inode, struct file *file) {
+static int sensor_release(struct inode *inode, struct file *file)
+{
 	kfree(file->private_data);
 	return 0;
 }
 
 static ssize_t sensor_read(struct file *file, char __user *user_buf,
-						   size_t count, loff_t *ppos) {
+						   size_t count, loff_t *ppos)
+{
 	char *buf;
 	int len;
 	int bytes_to_copy;
@@ -88,7 +93,8 @@ static ssize_t sensor_read(struct file *file, char __user *user_buf,
 
 }
 
-static long sensor_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
+static long sensor_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
 	int new_rate;
 
 	switch(cmd) {
@@ -152,7 +158,8 @@ static struct miscdevice sensor_misc = {
 
 // called when the user runs: cat /sys/.../sample_rate
 static ssize_t sample_rate_show(struct device *dev,
-                                struct device_attribute *attr, char *buf) {
+                                struct device_attribute *attr, char *buf)
+{
 	ssize_t ret;
 	if (mutex_lock_interruptible(&sensor_lock))
 		return -ERESTARTSYS;
@@ -166,7 +173,8 @@ static ssize_t sample_rate_show(struct device *dev,
 // Called when the user runs: echo 100 > /sys/.../sample_rate
 static ssize_t sample_rate_store(struct device *dev,
                                  struct device_attribute *attr, const char *buf,
-                                 size_t count) {
+                                 size_t count)
+{
 	int new_rate;
 
 	if (mutex_lock_interruptible(&sensor_lock))
@@ -186,7 +194,8 @@ static ssize_t sample_rate_store(struct device *dev,
 static DEVICE_ATTR_RW(sample_rate);
 
 /* PROBE FUNCTION */
-static int sensor_probe(struct platform_device *pdev) {
+static int sensor_probe(struct platform_device *pdev)
+{
     struct device *dev = &pdev->dev;
     int ret;
     int irq_num;
@@ -233,7 +242,8 @@ static int sensor_probe(struct platform_device *pdev) {
 
 /* ROOM FUNCTION */
 // Called when the module is unloaded or physically ripped out
-static int sensor_remove(struct platform_device *pdev) {
+static int sensor_remove(struct platform_device *pdev)
+{
     misc_deregister(&sensor_misc);
     printk(KERN_INFO "DummySensor: Driver and /dev node removed.\n");
 
