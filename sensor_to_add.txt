@@ -1,0 +1,7 @@
+  my_custom_sensor {
+            compatible = "kernel,dummy-sensor";
+                  status = "okay";
+                  sensor-id = <0x42>;
+      interrupt-parent = <0x8002>;
+      interrupts = <0 42 4>;
+        };
