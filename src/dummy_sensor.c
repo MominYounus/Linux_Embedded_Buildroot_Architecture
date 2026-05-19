@@ -277,5 +277,5 @@ static struct platform_driver sensor_driver = {
 module_platform_driver(sensor_driver);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("KERNEL");
+MODULE_AUTHOR("Mohammed Momin");
 MODULE_DESCRIPTION("A simple Platform Driver testing DTB matching");
